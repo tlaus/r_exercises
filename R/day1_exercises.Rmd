@@ -1,0 +1,477 @@
+---
+title: "R exercises, day 1"
+author: "Tereza Lausová"
+date: "14 9 2020"
+output: html_document
+---
+## Task 1
+```{r, fig.width=6, fig.height=6}
+library(tidyverse)
+library(patchwork)
+
+data(iris)
+# plot(iris)
+
+# Sepal plot
+sepal_c <- ggplot(iris) +
+  theme_minimal() +
+  geom_rect(aes(xmax = Sepal.Width+Sepal.Width/20, ymin = Sepal.Length-Sepal.Length/20, xmin=Sepal.Width-Sepal.Width/20, ymax=Sepal.Length+Sepal.Length/20, fill = Species), color = "black", alpha = 0.5) +
+  xlim(0,9) +
+  ylim(0,9) +
+  theme(legend.position = c(0.75, 0.5), 
+        legend.background = element_rect(colour = NA, fill = "white")) +
+  coord_fixed() +
+  labs(title = "Sepal size in the iris dataset in proportion")
+
+sepal_b <- ggplot(iris) +
+  theme_minimal() +
+  geom_density(aes(x = Sepal.Width, fill = Species), alpha = 0.5) +
+  xlim(0,9) +
+  guides(fill = "none")
+
+sepal_l <- ggplot(iris) +
+  theme_minimal() +
+  geom_density(aes(y = Sepal.Length, fill = Species), alpha = 0.5) +
+  ylim(0,9) +
+  guides(fill = "none")
+
+
+sepal_plot <- sepal_l + sepal_c + plot_spacer() + sepal_b + plot_layout(widths = c(1,6), heights = c(6,1))
+
+# png(filename = here("plots/iris_sepal.png"))
+sepal_plot
+# dev.off()
+
+# Petal plot
+petal_c <- ggplot(iris) +
+  theme_minimal() +
+  # geom_ellipse(aes(x0 = Petal.Width, y0 = Petal.Length, a = Petal.Width/30, b = Petal.Length/30, angle = 0, fill = Species), alpha = 0.5) +
+  # geom_linerange(aes(x = Petal.Width, size = Petal.Width, ymin = Petal.Length-(Petal.Length/20), ymax = Petal.Length+(Petal.Length/20), color = Species)) +
+  geom_rect(aes(xmax = Petal.Width+Petal.Width/20, ymin = Petal.Length-Petal.Length/20, xmin=Petal.Width-Petal.Width/20, ymax=Petal.Length+Petal.Length/20, fill = Species), color = "black", alpha = 0.5) +
+  # coord_fixed() +
+  theme(legend.position = c(0.75, 0.5), 
+        legend.background = element_rect(colour = NA, fill = "white")) +
+  xlim(0,8) +
+  ylim(0,8) +
+  labs(title = "Petal size in the iris dataset in proportion")
+
+petal_b <- ggplot(iris) +
+  theme_minimal() +
+  geom_density(aes(x = Petal.Width, fill = Species), alpha = 0.5) +
+  xlim(0,8) +
+  # coord_fixed(1/8) +
+  guides(fill = "none")
+
+petal_l <- ggplot(iris) +
+  theme_minimal() +
+  geom_density(aes(y = Petal.Length, fill = Species), alpha = 0.5) +
+  ylim(0,8) +
+  # coord_fixed(8/1) +
+  guides(fill = "none")
+
+
+petal_plot <- petal_l + petal_c + plot_spacer() + petal_b + plot_layout(widths = c(1,6), heights = c(6,1))
+
+
+# png(filename = here("plots/iris_petal.png"))
+petal_plot
+# dev.off()
+```
+
+## Task 2
+I used the bioMart package to retrieve the ensembl data, but I load in the interleukin family members as a csv from https://www.genenames.org/data/genegroup/#!/group/601
+```{r, fig.width=6, fig.height=6}
+library(here)
+if (!require(biomaRt)) {
+  BiocManager::install("biomaRt")
+}
+
+# listMarts()
+ensembl <- useMart("ensembl")
+# listDatasets(mart = ensembl)
+# datasets <- listDatasets(ensembl)
+# head(datasets)
+# dim(datasets)
+
+hs <- useDataset("hsapiens_gene_ensembl",mart=ensembl)
+
+# listFilters(hs)
+# listAttributes(hs)
+
+interleukins <- read_csv(here("data/group-601.csv"), skip = 1)
+interleukins$`Approved symbol`
+
+hs_data <- getBM(mart = hs, 
+                 attributes = c("ensembl_gene_id", "chromosome_name", "start_position","external_gene_name"), filters = c("external_gene_name"), values = interleukins$`Approved symbol`)
+
+hs_data$chromosome_name <- factor(hs_data$chromosome_name, levels = c(1:22, "X", "Y"))
+hs_data$external_gene_name_levels <- as.numeric(as.factor(hs_data$external_gene_name))
+
+# png(filename = here("plots/IL_chromosomes.png"))
+
+ggplot(data = hs_data, aes(x = chromosome_name)) + 
+  theme_minimal() +
+  geom_bar(aes(fill = chromosome_name), stat = "count", alpha = 0.5,
+           position = ) +
+  geom_point(aes(y = external_gene_name_levels/4)) +
+  geom_segment(aes(y = external_gene_name_levels/4, 
+                   yend = external_gene_name_levels/4,
+                   x = chromosome_name,
+                   xend = 25, 
+                   group = external_gene_name), linetype = "dashed") +
+  scale_x_discrete(drop = F) +
+  scale_y_continuous(breaks = 1:(max(summary.factor(hs_data$chromosome_name))*4),
+                     sec.axis = sec_axis(~.*4,
+                                         breaks = 1:length(hs_data$external_gene_name_levels),
+                                         labels = hs_data$external_gene_name)) +
+  guides(fill = "none") +
+  labs(title = "Interleukin family genes location on chromosomes")
+
+# dev.off()
+
+```
+
+## Task 3
+Code from https://www.stat.auckland.ac.nz/~paul/RGraphics/examples-map.R
+```{r fig.width=8, fig.height=6}
+# install.packages("mapproj")
+library(maps)
+
+# png(filename = here("plots/auckland_turns_heidelberg.png"))
+
+par(mar=rep(0, 4))
+map("nz", fill=TRUE, col="cornflowerblue")
+points(174.75, -36.87, pch=16, cex=2, add = TRUE)
+arrows(172, -36.87, 174, -36.87, lwd=3)
+text(172, -36.87, "Heidelberg", adj=1, cex=2)
+# mini world map as guide
+maplocs <- map(projection="sp_mercator", wrap=TRUE, lwd=0.1, 
+               col="grey", ylim=c(-60, 75),
+               interior=FALSE, orientation=c(90, 180, 0), add=TRUE,
+               plot=FALSE)
+xrange <- range(maplocs$x, na.rm=TRUE)
+yrange <- range(maplocs$y, na.rm=TRUE)
+aspect <- abs(diff(yrange))/abs(diff(xrange))
+# customised to 6.5 by 4.5 figure size
+par(fig=c(0.99 - 0.5, 0.99, 0.01, 0.01 + 0.5*aspect*4.5/6.5), 
+    mar=rep(0, 4), new=TRUE)
+plot.new()
+plot.window(xlim=xrange,
+            ylim=yrange)
+map(projection="sp_mercator", wrap=TRUE, lwd=0.1, ylim=c(-60, 75),
+    interior=FALSE, orientation=c(90, 180, 0), add=TRUE)
+symbols(-.13, -0.8, circles=1, inches=0.1, add=TRUE)
+
+# dev.off()
+```
+
+## Task 4
+```{r}
+# TBA
+```
+
+## Task 5
+Code from https://www.stat.auckland.ac.nz/~paul/RGraphics/examples-arden.R
+```{r}
+# Figure 1.9 
+##############
+
+# png(filename = here("plots/globe.png"))
+
+par(mfrow=c(2, 1), pty="s", mar=rep(1, 4)) 
+# Create plotting region and plot outer circle
+plot(c(-1.1, 1.2), c(-1.1, 1.2),
+     type="n", xlab="", ylab="", 
+     xaxt="n", yaxt="n", cex.lab=2.5)
+angs <- seq(0, 2*pi, length=500)
+XX <- sin(angs)
+YY <- cos(angs)
+lines(XX, YY, type="l")
+
+# Set constants
+phi1 <- pi*2/9
+k1 <- sin(phi1)
+k2 <- cos(phi1)
+
+# Create grey regions
+obsphi <- pi/12
+lambdas <- seq(-pi, pi, length=500)
+xx <- cos(pi/2 - obsphi)*sin(lambdas)
+yy <- k2*sin(pi/2 - obsphi)-k1 * cos(pi/2 - obsphi)*cos(lambdas)
+polygon(xx, yy, col="dodgerblue2")
+lines(xx, yy, lwd=2)
+theta1sA <- seq(-obsphi, obsphi, length=500)
+theta2sA <- acos(cos(obsphi)/cos(theta1sA))
+theta1sB <- seq(obsphi, -obsphi, length=500)
+theta2sB <-  -acos(cos(obsphi)/cos(theta1sB))
+theta1s <- c(theta1sA, theta1sB)
+theta2s <- c(theta2sA, theta2sB)
+xx <- cos(theta1s)*sin(theta2s+pi/4)
+yy <- k2*sin(theta1s)-k1*cos(theta1s)*cos(theta2s+pi/4)
+polygon(xx, yy, col="dodgerblue2")
+lines(xx, yy, lwd=2)
+xx <- cos(theta1s)*sin(theta2s-pi/4)
+yy <- k2*sin(theta1s)-k1*cos(theta1s)*cos(theta2s-pi/4)
+polygon(xx, yy, col="dodgerblue2")
+lines(xx, yy, lwd=2)
+
+# Plot longitudes
+vals <- seq(0, 7, 1)*pi/8
+for(lambda in vals){
+sl <- sin(lambda)
+cl <- cos(lambda)
+phi <- atan(((0-1)*k2*cl)/(k1))
+angs <- seq(phi, pi+phi, length=500)
+xx <- cos(angs)*sl
+yy <- k2*sin(angs)-k1*cos(angs)*cl
+lines(xx, yy, lwd=.5)
+}
+
+# Grey out polar cap
+phi <- 5.6*pi/12
+lambdas <- seq(-pi, pi, length=500)
+xx <- cos(phi)*sin(lambdas)
+yy <- k2*sin(phi)-k1 * cos(phi)*cos(lambdas)
+polygon(xx, yy, col="cornflowerblue")
+
+# Plot Latitudes
+vals2 <- seq(-2.8, 5.6, 1.4)*pi/12
+for(phi in vals2){
+  if (k1*sin(phi) > k2 * cos(phi)) 
+    crit <- pi 
+  else 
+    crit <- acos((-k1*sin(phi))/(k2*cos(phi)))
+  lambdas <- seq(-crit, crit, length=500)
+  xx <- cos(phi)*sin(lambdas)
+  yy <- k2*sin(phi)-k1 * cos(phi)*cos(lambdas)
+  lines(xx, yy, lwd=.5)
+}
+
+
+# Plots axes and label
+lines(c(0.00, 0.00), c(k2*sin(pi/2), 1.11), lwd=4)
+lines(c(0.00, 0.00), c(-1, -1.12), lwd=4)
+a2x <- sin(-pi/4)
+a2y <- cos(-pi/4)*(-k1)
+lines(c(a2x, 1.5*a2x), c(a2y, 1.5*a2y), lwd=4)
+k <- sqrt(a2x^2+a2y^2)
+lines(c(-a2x/k, 1.2*(-a2x/k)), c(-a2y/k, 1.2*(-a2y/k)), lwd=4)
+a3x <- sin(pi/4)
+a3y <- cos(pi/4)*(-k1)
+lines(c(a3x, 1.5*a3x), c(a3y, 1.5*a3y), lwd=4)
+k <- sqrt(a3x^2+a3y^2)
+lines(c(-a3x/k, 1.2*(-a3x/k)), c(-a3y/k, 1.2*(-a3y/k)), lwd=4)
+text(0.1, 1.12, expression(bold(X[1])))
+text(-1.07, -.85, expression(bold(X[2])))
+text(1.11, -.85, expression(bold(X[3])))
+
+# set plot region and draw outer circle
+plot(c(-1.1, 1.2),  c(-1.1, 1.2),
+     type="n", xlab="", ylab="", 
+     xaxt="n", yaxt="n", cex.lab=2.5)
+angs <- seq(0, 2*pi, length=500)
+XX <- sin(angs)
+YY <- cos(angs)
+lines(XX, YY, type="l")
+
+# set constants
+phi1 <- pi*2/9
+k1 <- sin(phi1)
+k2 <- cos(phi1)
+obsphi <- pi/24
+
+# create X2X3 grey region and plot boundary
+crit <- acos((-k1*sin(obsphi))/(k2 * cos(obsphi)))
+lambdas <- seq(-crit, crit, length=500)
+xx1 <- cos(obsphi)*sin(lambdas)
+yy1 <- k2*sin(obsphi)-k1 * cos(obsphi)*cos(lambdas)
+obsphi <-  -pi/24
+crit <- acos((-k1*sin(obsphi))/(k2 * cos(obsphi)))
+lambdas <- seq(crit, -crit, length=500)
+xx3 <- cos(obsphi)*sin(lambdas)
+yy3 <- k2*sin(obsphi)-k1 * cos(obsphi)*cos(lambdas)
+ang1 <-  atan(xx1[500]/yy1[500])
+ang2 <- pi+atan(xx3[1]/yy3[1])
+angs <- seq(ang1, ang2, length=50)
+xx2 <- sin(angs)
+yy2 <- cos(angs)
+ang4 <-  atan(xx1[1]/yy1[1])
+ang3 <-  -pi+ atan(xx3[500]/yy3[500])
+angs <- seq(ang3, ang4, length=50)
+xx4 <- sin(angs)
+yy4 <- cos(angs)
+xxA <- c(xx1, xx2, xx3, xx4)
+yyA <- c(yy1, yy2, yy3, yy4)
+polygon(xxA, yyA, border="grey", col="goldenrod")
+xx1A <- xx1
+yy1A <- yy1
+xx3A <- xx3
+yy3A <- yy3
+
+# create X1X3 grey region and plot boundary
+obsphi <- pi/24
+crit <- pi/2-obsphi
+theta1sA <- c(seq(-crit, crit/2, length=200), seq(crit/2, crit, length=500))
+theta2sA <- asin(cos(crit)/cos(theta1sA))
+theta1sB <- seq(crit, crit/2, length=500)
+theta2sB <-  pi-asin(cos(crit)/cos(theta1sB))
+theta1s <- c(theta1sA, theta1sB)
+theta2s <- c(theta2sA, theta2sB)
+vals <- k1*sin(theta1s)+k2*cos(theta1s)*cos(theta2s+pi/4)
+xx1 <- cos(theta1s[vals>=0])*sin(theta2s[vals>=0]+pi/4)
+yy1 <- k2*sin(theta1s[vals>=0])-k1*cos(theta1s[vals>=0])*cos(theta2s[vals>=0]+pi/4)
+theta2s <-  -theta2s
+vals <- k1*sin(theta1s)+k2*cos(theta1s)*cos(theta2s+pi/4)
+xx3 <- cos(theta1s[vals>=0])*sin(theta2s[vals>=0]+pi/4)
+yy3 <- k2*sin(theta1s[vals>=0])-k1*cos(theta1s[vals>=0])*cos(theta2s[vals>=0]+pi/4)
+rev <- seq(length(xx3), 1, -1)
+xx3 <- xx3[rev]
+yy3 <- yy3[rev]
+ang1 <-  pi+atan(xx1[length(xx1)]/yy1[length(yy1)])
+ang2 <-  pi+atan(xx3[1]/yy3[1])
+angs <- seq(ang1, ang2, length=50)
+xx2 <- sin(angs)
+yy2 <- cos(angs)
+ang4 <-  pi+atan(xx1[1]/yy1[1])
+ang3 <-  pi+atan(xx3[length(xx3)]/yy3[length(yy3)])
+angs <- seq(ang3, ang4, length=50)
+xx4 <- sin(angs)
+yy4 <- cos(angs)
+xxB <- c(xx1, -xx2, xx3, xx4)
+yyB <- c(yy1, -yy2, yy3, yy4)
+polygon(xxB, yyB, border="grey", col="sienna")
+xx1B <- xx1
+yy1B <- yy1
+xx3B <- xx3
+yy3B <- yy3
+
+# create X1X2 grey region and plot boundary
+vals <- k1*sin(theta1s)+k2*cos(theta1s)*cos(theta2s-pi/4)
+xx1 <- cos(theta1s[vals>=0])*sin(theta2s[vals>=0]-pi/4)
+yy1 <- k2*sin(theta1s[vals>=0])-k1*cos(theta1s[vals>=0])*cos(theta2s[vals>=0]-pi/4)
+theta2s <-  -theta2s
+vals <- k1*sin(theta1s)+k2*cos(theta1s)*cos(theta2s-pi/4)
+xx3 <- cos(theta1s[vals>=0])*sin(theta2s[vals>=0]-pi/4)
+yy3 <- k2*sin(theta1s[vals>=0])-k1*cos(theta1s[vals>=0])*cos(theta2s[vals>=0]-pi/4)
+rev <- seq(length(xx3), 1, -1)
+xx3 <- xx3[rev]
+yy3 <- yy3[rev]
+ang1 <-  pi+atan(xx1[length(xx1)]/yy1[length(yy1)])
+ang2 <-  pi+atan(xx3[1]/yy3[1])
+angs <- seq(ang1, ang2, length=50)
+xx2 <- sin(angs)
+yy2 <- cos(angs)
+ang4 <-  pi+atan(xx1[1]/yy1[1])
+ang3 <-  pi+atan(xx3[length(xx3)]/yy3[length(yy3)])
+angs <- seq(ang3, ang4, length=50)
+xx4 <- sin(angs)
+yy4 <- cos(angs)
+xx <- c(xx1, -xx2, xx3, xx4)
+yy <- c(yy1, -yy2, yy3, yy4)
+polygon(xx, yy, border="grey", col="lightcoral")
+xx1C <- xx1
+yy1C <- yy1
+xx3C <- xx3
+yy3C <- yy3
+
+
+# plot boundaries to grey regions
+lines(xx1C[2:45], yy1C[2:45], lwd=2)
+lines(xx1C[69:583], yy1C[69:583], lwd=2)
+lines(xx1C[660:1080], yy1C[660:1080], lwd=2)
+lines(xx3C[13:455], yy3C[13:455], lwd=2)
+lines(xx3C[538:1055], yy3C[538:1055], lwd=2)
+lines(xx3C[1079:1135], yy3C[1079:1135], lwd=2)
+lines(xx1A[6:113], yy1A[6:113], lwd=2)
+lines(xx1A[153:346], yy1A[153:346], lwd=2)
+lines(xx1A[389:484], yy1A[389:484], lwd=2)
+lines(xx3A[1:93], yy3A[1:93], lwd=2)
+lines(xx3A[140:362], yy3A[140:362], lwd=2)
+lines(xx3A[408:497], yy3A[408:497], lwd=2)
+lines(xx1B[2:45], yy1B[2:45], lwd=2)
+lines(xx1B[69:583], yy1B[69:583], lwd=2)
+lines(xx1B[660:1080], yy1B[660:1080], lwd=2)
+lines(xx3B[13:455], yy3B[13:455], lwd=2)
+lines(xx3B[538:1055], yy3B[538:1055], lwd=2)
+lines(xx3B[1079:1135], yy3B[1079:1135], lwd=2)
+
+# Plot longitudes
+vals <- seq(-7, 8, 1)*pi/8
+for(lambda in vals){
+  sl <- sin(lambda)
+  cl <- cos(lambda)
+  phi <- atan(((0-1)*k2*cl)/(k1))
+  angs <- seq(phi, 5.6*pi/12, length=500)
+  xx <- cos(angs)*sl
+  yy <- k2*sin(angs)-k1*cos(angs)*cl
+  lines(xx, yy, lwd=.5)
+}
+
+
+# Plot Latitudes
+# vals2 <- seq(-2.8, 5.6, 1.4)*pi/12
+vals2 <- c(-1.5, 0, 1.5, 3.0, 4.5, 5.6)*pi/12
+for(phi in vals2){
+  if (k1*sin(phi) > k2 * cos(phi)) 
+    crit <- pi 
+  else 
+    crit <- acos((-k1*sin(phi))/(k2*cos(phi)))
+  lambdas <- seq(-crit, crit, length=500)
+  xx <- cos(phi)*sin(lambdas)
+  yy <- k2*sin(phi)-k1 * cos(phi)*cos(lambdas)
+  lines(xx, yy, lwd=.5)
+}
+
+
+# create lines for X1X2- and X1X3-planes
+lambda <- pi/4
+sl <- sin(lambda)
+cl <- cos(lambda)
+phi <- atan(((0-1)*k2*cl)/(k1))
+angs <- seq(phi, pi+phi, length=500)
+xx <- cos(angs)*sl
+yy <- k2*sin(angs)-k1*cos(angs)*cl
+lines(xx, yy, lwd=2)
+lambda <- 3*pi/4
+sl <- sin(lambda)
+cl <- cos(lambda)
+phi <- atan(((0-1)*k2*cl)/(k1))
+angs <- seq(phi, pi+phi, length=500)
+xx <- cos(angs)*sl
+yy <- k2*sin(angs)-k1*cos(angs)*cl
+lines(xx, yy, lwd=2)
+
+# create line for X2X3-plane
+phi <- 0
+crit <- acos((-k1*sin(phi))/(k2 * cos(phi)))
+lambdas <- seq(-crit, crit, length=500)
+xx <- cos(phi)*sin(lambdas)
+yy <- k2*sin(phi)-k1 * cos(phi)*cos(lambdas)
+lines(xx, yy, lwd=2)
+
+# create axes
+lines(c(0.00, 0.00), c(k2*sin(pi/2), 1.11), lwd=4)
+lines(c(0.00, 0.00), c(-1, -1.12), lwd=4)
+a2x <- sin(-pi/4)
+a2y <- cos(-pi/4)*(-k1)
+lines(c(a2x, 1.5*a2x), c(a2y, 1.5*a2y), lwd=4)
+a3x <- sin(pi/4)
+a3y <- cos(pi/4)*(-k1)
+lines(c(a3x, 1.5*a3x), c(a3y, 1.5*a3y), lwd=4)
+k <- sqrt(a3x^2+a3y^2)
+lines(c(-a3x/k, 1.2*(-a3x/k)), c(-a3y/k, 1.2*(-a3y/k)), lwd=4)
+k <- sqrt(a2x^2+a2y^2)
+lines(c(-a2x/k, 1.2*(-a2x/k)), c(-a2y/k, 1.2*(-a2y/k)), lwd=4)
+
+
+# add text
+text(-1.07, -.85, expression(bold(X[2])))
+text(1.11, -.85, expression(bold(X[3])))
+text(0.1, 1.12, expression(bold(X[1])))
+
+lines(XX, YY, type="l")
+
+# dev.off()
+
+```
+
