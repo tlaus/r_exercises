@@ -1,5 +1,5 @@
 ## Aufgabe 6 - Microarray analysis
-## Tereza Lausová
+## Tereza Lausova
 ## 15.9.2020
 
 # Load and setup libraries
@@ -17,6 +17,7 @@ library(affy)
 library(AnnotationDbi)
 library(reshape2)
 library(biomaRt)
+library(qpdf)
 
 # load data
 # bc_cel <- ReadAffy(celfile.path = here("rawdata"))
@@ -33,7 +34,7 @@ image(bc_cel, col = rainbow(100, start=0, end=0.75)[100:1])
 
 # GSM687020 - green flake on the scan
 singlechip <- bc_cel[5]
-pdf(here("plots/Lausová_Aufgabe6_QC_singlechip.pdf"))
+pdf(here("plots/Lausova_Aufgabe6_QC_singlechip.pdf"))
 image(singlechip, col = rainbow(100, start=0, end=0.75)[100:1])
 dev.off()
 
@@ -59,10 +60,10 @@ tidy_exprs <- exprs(bc_cel) %>%
   as_tibble() %>%
   mutate("sample" = Var2)
 
-pdf(here("plots/Lausová_Aufgabe6_rawdata.pdf"))
+pdf(here("plots/Lausova_Aufgabe6_rawdata.pdf"))
 ggplot(tidy_exprs, aes(x = log(value), fill = sample, y = sample)) +
   theme_minimal() +
-  geom_violin() +
+  geom_boxplot() +
   guides(fill = "none") +
   labs(title = "Breast cancer microarray data before normalization")
   # facet_wrap(~sample, nrow = 10) # for density plots
@@ -74,10 +75,10 @@ tidy_norm <- exprs(bc_norm) %>%
   as_tibble() %>%
   mutate("sample" = Var2)
 
-pdf(here("plots/Lausová_Aufgabe6_normalized.pdf"))
+pdf(here("plots/Lausova_Aufgabe6_normalized.pdf"))
 ggplot(tidy_norm, aes(x = log(value), fill = sample, y = sample)) +
   theme_minimal() +
-  geom_violin() +
+  geom_boxplot() +
   guides(fill = "none")+
   labs(title = "Breast cancer microarray data after normalization")
 dev.off()
@@ -86,17 +87,36 @@ dev.off()
 
 ## RNA degradation plot
 bc_rnadeg <- AffyRNAdeg(bc_cel)
-pdf(here("plots/Lausová_Aufgabe6_RNAdeg.pdf"))
+pdf(here("plots/Lausova_Aufgabe6_RNAdeg.pdf"))
 plotAffyRNAdeg(bc_rnadeg, cols = rainbow(10))
 plotAffyRNAdeg(bc_rnadeg, cols = rainbow(10), transform = "shift.only")
 dev.off()
 
 ## scatterplot
-pdf(here("plots/Lausová_Aufgabe6_QC_scatterplot.pdf"))
+pdf(here("plots/Lausova_Aufgabe6_QC_scatterplot.pdf"))
 map(c(1:length(colnames(bc_norm))-1), function(sample) {
   plot(exprs(bc_norm)[,c(sample, sample+1)], pch=".")
   abline(0,1,col="red")
 })
+dev.off()
+length_pdf <- pdf_length(input = here("plots/Lausova_Aufgabe6_QC_scatterplot.pdf"))
+pdf_subset(input = here("plots/Lausova_Aufgabe6_QC_scatterplot.pdf"), pages = 2:length_pdf, output = NULL)
+
+## density plots
+
+pdf(here("plots/Lausova_Aufgabe6_histogram.pdf"), onefile = T)
+## Not normalized
+ggplot(tidy_exprs) +
+  theme_minimal() +
+  geom_density(aes(x = value), fill = "cornflowerblue") +
+  labs(title = "Density plot of non-normalised expression data")
+
+## Normalized
+ggplot(tidy_norm) +
+  theme_minimal() +
+  geom_density(aes(x = value), fill = "cornflowerblue")+
+  labs(title = "Density plot of normalised expression data")
+
 dev.off()
 
 # analysis
@@ -121,25 +141,40 @@ bc_filtered <- exprs(bc_norm)[which(all_names %in% entrez_data$ensembl_transcrip
 all_names <- all_names[which(all_names %in% entrez_data$ensembl_transcript_id_version)]
 rownames(bc_filtered) <- entrez_data$ensembl_transcript_id_version[which(all_names %in% entrez_data$ensembl_transcript_id_version)]
 
-matched <- which(entrez_data$ensembl_transcript_id_version %in% rownames(bc_filtered))
-bc_norm_annotated <- cbind(entrez_data[matched,], bc_filtered)
-write_csv(entrez_data, here("tables/Lausová_Aufgabe6_Microarray_ILgenes.csv"))
+# matched <- which(entrez_data$ensembl_transcript_id_version %in% rownames(bc_filtered)) # This is not correct (probably)
+# bc_norm_annotated <- cbind(entrez_data[matched,], bc_filtered)
+# write_csv(entrez_data, here("tables/Lausova_Aufgabe6_Microarray_ILgenes.csv"))
 
 ## gene expression
-rownames(bc_filtered) <- entrez_data$external_gene_name[which(all_names %in% entrez_data$ensembl_transcript_id_version)]
+entrez_data_filtered <- entrez_data[which(all_names %in% entrez_data$ensembl_transcript_id_version),]
+rownames(bc_filtered) <- entrez_data_filtered$external_transcript_name
 interleukins_boolean <- grepl("^IL\\d+", rownames(bc_filtered))
 any(interleukins_boolean)
 bc_IL <- bc_filtered[interleukins_boolean, ]
 
+bc_IL_annotated <- cbind(bc_IL, entrez_data_filtered[interleukins_boolean,])
+write_csv(bc_IL_annotated, "tables/Lausova_Aufgabe6_Microarray_ILgenes.csv")
+
+bc_all_annotated <- cbind(bc_filtered, entrez_data_filtered)
+write_csv(bc_all_annotated, "tables/Lausova_Aufgabe6_Microarray_Genes.csv")
+
+
 bc_IL_tidy <- bc_IL %>%
   melt() %>%
   as_tibble() %>%
-  mutate("gene" = as.character(Var1), "sample" = Var2, "intensity" = value) %>%
-  arrange(desc(gene)) %>%
+  mutate("transcript" = as.character(Var1), "sample" = Var2, "intensity" = value) %>%
+  arrange(desc(transcript)) %>%
+  mutate(transcript_groups = str_extract(transcript, pattern = "[:alnum:]{2,}-") %>% str_sub(end = -2)) %>%
+  # group_by(transcript) %>%
+  # mutate(median_val = median(value)) %>%
+  # arrange(desc(median_val)) %>%
+  # ungroup() %>%
   mutate_if(is.character, as.factor)
 
-pdf(here("plots/Lausová_Aufgabe6_histogram.pdf"), height = 8, width = 6)
-ggplot(bc_IL_tidy, aes(x = intensity, y = gene, fill = gene)) +
+
+
+pdf(here("plots/Lausova_Aufgabe6_histogram.pdf"), height = 36, width = 6)
+ggplot(bc_IL_tidy, aes(x = intensity, y = transcript, fill = transcript_groups)) +
   geom_boxplot() +
   guides(fill = "none")
 dev.off()
