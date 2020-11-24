@@ -104,7 +104,7 @@ pdf_subset(input = here("plots/Lausova_Aufgabe6_QC_scatterplot.pdf"), pages = 2:
 
 ## density plots
 
-pdf(here("plots/Lausova_Aufgabe6_histogram.pdf"), onefile = T)
+pdf(here("plots/Lausova_Aufgabe6_histogram.pdf"), onefile = T, width = 6, height = 4)
 ## Not normalized
 ggplot(tidy_exprs) +
   theme_minimal() +
@@ -163,8 +163,12 @@ bc_IL_tidy <- bc_IL %>%
   melt() %>%
   as_tibble() %>%
   mutate("transcript" = as.character(Var1), "sample" = Var2, "intensity" = value) %>%
-  arrange(desc(transcript)) %>%
+  # arrange(desc(transcript)) %>%
   mutate(transcript_groups = str_extract(transcript, pattern = "[:alnum:]{2,}-") %>% str_sub(end = -2)) %>%
+  arrange(transcript_groups) %>%
+  group_by(transcript_groups) %>%
+  arrange(transcript) %>%
+  ungroup() %>%
   # group_by(transcript) %>%
   # mutate(median_val = median(value)) %>%
   # arrange(desc(median_val)) %>%
@@ -172,8 +176,7 @@ bc_IL_tidy <- bc_IL %>%
   mutate_if(is.character, as.factor)
 
 
-
-pdf(here("plots/Lausova_Aufgabe6_histogram.pdf"), height = 36, width = 6)
+pdf(here("plots/Lausova_Aufgabe6_Gene_expression_IL_breast_cancer.pdf"), height = 36, width = 6)
 ggplot(bc_IL_tidy, aes(x = intensity, y = transcript, fill = transcript_groups)) +
   geom_boxplot() +
   guides(fill = "none")

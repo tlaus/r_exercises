@@ -1,0 +1,220 @@
+---
+title: "Aufgabe 4 - Tasks from Programieren mit R, Uwe Ligges, 2005"
+author: "Tereza Lausová"
+date: "19 11 2020"
+output: html_document
+---
+
+# 2.1
+
+```{r}
+1+2*3
+2*5^2-10*5
+4*sin(pi/2)
+0/0
+```
+
+# 2.2
+```{r}
+x1 <- 3.25
+x1
+
+x2 = 3.25
+x2
+
+6 -> x3
+
+#############
+
+x1 <- 7
+x1
+print(x1)
+(x1 <- 3.25) # this will also print the result! I didn't know that
+```
+
+# 2.3
+```{r}
+(X <- matrix(1:6,2))
+mode(X)
+attributes(X)
+attributes(X)$dim # there is only one attribute
+```
+
+# 2.4
+```{r}
+help(sum)
+?sum
+vignette(all = FALSE)
+```
+
+# 2.5
+```{r}
+data(iris)
+# ?iris
+# iris
+summary(iris)
+attach(iris) # Makes the columns accessible as variable names from within the R, also didn't know this
+
+species.n <- as.numeric(Species)
+
+plot(iris, col = species.n)
+
+hist(Petal.Length)
+
+op <- par(mfrow = c(2,2))
+
+for (i in 1:4) {
+  boxplot(iris[,i]~Species, main = colnames(iris)[i])
+}
+
+par(op)
+
+#############
+library(rpart)
+
+(rpo <- rpart(Species~.,
+              data = iris))
+plot(rpo, margin = 0.1,
+     branch = 0.5)
+text(rpo)
+
+#############
+library(MASS)
+
+(ldao <- lda(Species~.,
+             data = iris))
+plot(ldao, abbrev = TRUE,
+     col = species.n)
+
+#############
+detach(iris)
+ls() # check if detached
+```
+
+# 2.6
+```{r}
+getwd()
+```
+
+# 2.7
+```{r}
+4 < 3
+(3+1) != 3
+# -3<-2 # R thinks this is an arrow <- and assignment
+-3 < -2
+
+#############
+
+(3 >= 2) && (4 == (3 + 1))
+FALSE && TRUE
+TRUE && FALSE
+TRUE || FALSE
+x <- 0
+TRUE || (x <- 3) # the second expression is not evaluated, the algorithm stops at first TRUE
+x
+
+FALSE || TRUE
+FALSE || (x <- 3) # the second expression IS evaluated, because the first argument was FALSE
+x # therefore it is changed
+
+#############
+
+c(TRUE, TRUE) & c(FALSE, FALSE) # one & works vector-wise: the first of first vector is compared with the first of second vector
+c(TRUE, TRUE) && c(TRUE, TRUE) # two && do not evaluate vector-wise, and return just one value
+
+#############
+
+T & F
+T & T
+T <- 0 # TRUE <- 0 doesn't work though, because it is a reserved word in R
+T & T
+
+T <- 1
+
+#############
+
+sum(FALSE, TRUE, TRUE)
+
+x <- c(-3, 5, 2, 0, -2)
+x < 0 # works vector-wise
+sum(x < 0) # can provide information about how many members fulfill condition
+
+#############
+
+x <- c(2, 9, 3, 1, 6)
+eininge <- x > 4
+alle <- x > 0
+
+any(eininge)
+any(alle)
+any(!alle) # inverses vector
+all(eininge)
+all(alle)
+which(eininge) # which are true
+which.max(x)
+
+#############
+x <- NA
+str(NA)
+y <- c(3, x)
+str(y) # vector-wise
+
+#############
+
+x <- c(NA, 7, NA, 22)
+mean(x) # NA is "contagious"
+mean(x, na.rm = TRUE)
+na.omit(x)
+
+attr(na.omit(x),"na.action") # writes the positions where NAs were removed and what happened to them. This is actually really cool
+```
+
+# 2.8
+```{r}
+(x <- pi)
+mode(x)
+typeof(x)
+(y <- as.integer(x))
+typeof(y)
+
+is.character(y)
+x <- -1
+sqrt(x)
+sqrt(as.complex(x))
+
+#############
+
+(trt <- factor(rep(c("Control", "Treated"), c(3,4))))
+str(trt)
+mode(trt) # Factors are actually numbers
+length(trt)
+```
+
+# 2.9
+```{r}
+(x <- c(4.1, 5.0, 6.35))
+(x <- c(7.9,x,2))
+(y <- c("Hallo", "Leser"))
+(y <- c("Hallo", TRUE, x)) # converts everything to character
+length(y)
+
+#############
+
+
+
+```
+
+# 2.10
+```{r}
+
+```
+
+# 2.11
+```{r}
+
+```
+
+# 2.12
+```{r}
+
+```
